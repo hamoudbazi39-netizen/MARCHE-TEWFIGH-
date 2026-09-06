@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Gestion de l'immeuble</title>
+<style>
+:root{
+  --bg:#EDF1F2;
+  --paper:#FFFFFF;
+  --ink:#10222E;
+  --ink-soft:#4B6072;
+  --line:#D6DEE2;
+  --blueprint:#123A5E;
+  --blueprint-line:#4E7A9C;
+  --blueprint-line-soft:#2C5779;
+  --copper:#BD6A34;
+  --copper-soft:#E7D3C0;
+  --occupied:#2F855A;
+  --occupied-soft:#DCEEE3;
+  --vacant:#7C8A93;
+  --vacant-soft:#E6EAEC;
+  --paid:#2F855A;
+  --unpaid:#B23A3A;
+  --unpaid-soft:#F5DEDA;
+  --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --sans: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);}
+#app{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--blueprint-line-soft);margin:0 0 4px;}
+h1{font-size:26px;letter-spacing:-.01em;margin:0 0 2px;font-weight:700;}
+.subtitle{color:var(--ink-soft);font-size:13.5px;margin:0 0 20px;}
+
+/* KPI row */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.kpi .val{font-family:var(--mono);font-size:20px;font-weight:700;}
+.kpi .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;}
+.tab-btn{background:none;border:none;padding:10px 16px;font-size:13.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;font-family:var(--sans);}
+.tab-btn.active{color:var(--blueprint);border-bottom-color:var(--copper);}
+.tab-btn:hover{color:var(--ink);}
+
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:22px;}
+.panel h2{font-size:15px;margin:0 0 4px;}
+.panel .desc{color:var(--ink-soft);font-size:12.5px;margin:0 0 16px;}
+
+/* Building elevation */
+.building{background:var(--blueprint);border-radius:10px;padding:18px 18px 10px;}
+.floor{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.floor-label{width:96px;flex-shrink:0;font-family:var(--mono);font-size:10.5px;color:var(--blueprint-line);text-align:right;letter-spacing:.04em;}
+.floor-units{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;flex:1;}
+.floor-units.appts{grid-template-columns:repeat(3,1fr);}
+.unit{background:rgba(255,255,255,.06);border:1px solid var(--blueprint-line-soft);border-radius:6px;padding:8px 8px 7px;cursor:pointer;transition:background .15s;position:relative;}
+.unit:hover{background:rgba(255,255,255,.14);}
+.unit .u-id{font-family:var(--mono);font-size:11px;color:#fff;font-weight:700;}
+.unit .u-name{font-size:10.5px;color:var(--blueprint-line);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dot{width:7px;height:7px;border-radius:50%;position:absolute;top:8px;right:8px;}
+.dot.occupied{background:#4FCE86;}
+.dot.warn{background:#E8A33D;}
+.dot.vacant{background:#8FA4B3;}
+.legend{display:flex;gap:16px;padding:10px 4px 4px;font-size:11px;color:var(--blueprint-line);}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.legend .dotL{width:7px;height:7px;border-radius:50%;display:inline-block;}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);padding:8px 10px;border-bottom:1px solid var(--line);}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+td.mono, th.mono{font-family:var(--mono);}
+tr:last-child td{border-bottom:none;}
+
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono);}
+.pill.occupied{background:var(--occupied-soft);color:var(--occupied);}
+.pill.vacant{background:var(--vacant-soft);color:var(--vacant);}
+.pill.paid{background:var(--occupied-soft);color:var(--paid);cursor:pointer;}
+.pill.unpaid{background:var(--unpaid-soft);color:var(--unpaid);cursor:pointer;}
+.pill.warn{background:#FBEAD2;color:#B9701E;}
+
+.btn{font-family:var(--sans);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:7px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer;}
+.btn:hover{border-color:var(--ink-soft);}
+.btn-primary{background:var(--blueprint);border-color:var(--blueprint);color:#fff;}
+.btn-primary:hover{background:var(--blueprint-line-soft);}
+.btn-copper{background:var(--copper);border-color:var(--copper);color:#fff;}
+.btn-sm{padding:5px 10px;font-size:11.5px;}
+.btn-danger{color:var(--unpaid);}
+
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.row.between{justify-content:space-between;}
+.field label{display:block;font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+.field input, .field select{font-family:var(--sans);font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;width:100%;}
+.field{margin-bottom:12px;}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(16,34,46,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+.modal{background:var(--paper);border-radius:12px;padding:22px;width:100%;max-width:380px;}
+.modal h3{margin:0 0 14px;font-size:15px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+
+/* Print invoice */
+.print-invoice, .print-report{display:none;}
+.inv-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;}
+.inv-head h2{margin:0;font-size:20px;}
+.inv-meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right;}
+.inv-box{border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px;}
+.inv-box .k{font-size:10.5px;text-transform:uppercase;color:var(--ink-soft);letter-spacing:.05em;}
+.inv-box .v{font-size:14px;margin-top:2px;}
+.inv-amount{font-family:var(--mono);font-size:28px;font-weight:700;text-align:right;margin:20px 0;}
+.inv-table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+.inv-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);padding:8px 6px;border-bottom:2px solid var(--ink);}
+.inv-table td{padding:12px 6px;border-bottom:1px solid var(--line);font-size:13.5px;}
+.inv-page{display:flex;flex-direction:column;min-height:100%;}
+.inv-body{flex:1;}
+.inv-letterhead{border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:28px;}
+.inv-letterhead .owner{font-size:17px;font-weight:700;letter-spacing:.02em;}
+.inv-letterhead .tf{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:3px;}
+.inv-title{font-size:24px;font-weight:700;letter-spacing:.08em;}
+.inv-number{font-family:var(--mono);font-size:13px;color:var(--ink-soft);margin-top:4px;}
+.inv-words-box{border:1px solid var(--ink);border-radius:6px;padding:14px 16px;margin:8px 0 18px;font-size:13px;}
+.inv-words-box .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:4px;}
+.inv-words-box .v{font-style:italic;font-size:14px;}
+.inv-footer{display:flex;justify-content:space-between;margin-top:60px;}
+.inv-sign{width:42%;text-align:center;font-size:12px;color:var(--ink-soft);}
+.inv-sign .line{border-top:1px solid var(--ink);margin-top:60px;padding-top:8px;}
+.rep-table{width:100%;border-collapse:collapse;margin:14px 0 24px;}
+.rep-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);padding:8px 6px;border-bottom:2px solid var(--ink);}
+.rep-table td{padding:9px 6px;border-bottom:1px solid var(--line);font-size:12.5px;}
+.rep-kpis{display:flex;gap:30px;margin:18px 0 8px;}
+.rep-kpis .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);}
+.rep-kpis .v{font-family:var(--mono);font-size:17px;font-weight:700;margin-top:3px;}
+@media print{
+  .inv-print-page{page-break-after:always;}
+  .inv-print-page:last-child{page-break-after:auto;}
+}
+
+.empty{color:var(--ink-soft);font-size:13px;padding:24px 0;text-align:center;}
+.msg{background:var(--copper-soft);color:var(--copper);border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;}
+.footer-link{color:var(--ink-soft);font-size:11.5px;text-decoration:underline;cursor:pointer;background:none;border:none;font-family:var(--sans);}
+
+@media print{
+  body *{visibility:hidden;}
+  .print-invoice, .print-invoice *, .print-report, .print-report *{visibility:visible;}
+  .print-invoice{display:block !important;position:absolute;top:0;left:0;width:100%;min-height:100vh;padding:30px 34px;}
+  .print-report{display:block !important;position:absolute;top:0;left:0;width:100%;min-height:100vh;padding:30px 34px;}
+}
+@media (max-width:700px){
+  .kpis{grid-template-columns:repeat(2,1fr);}
+  .floor{flex-direction:column;align-items:stretch;}
+  .floor-label{width:auto;text-align:left;}
+}
+</style>
+</head>
+<body>
+<div id="app">Chargement…</div>
+<div id="printArea" class="print-invoice"></div>
+<div id="printReportArea" class="print-report"></div>
+<script>
+function clearOtherPrintArea(keepId){
+  ['printArea','printReportArea'].forEach(id=>{
+    if(id!==keepId){ const el=document.getElementById(id); if(el) el.innerHTML=''; }
+  });
+}
+</script>
+
+<script>
+const UNIT_KEY='units';
+const INV_KEY='invoices';
+const ELEC_KEY='elecInvoices';
+const METER_KEY='elecMeters';
+const ELEC_RATE=7;
+const OWNER_NAME='EMMA LIMAM OULIEDA';
+const OWNER_TF='TF 93';
+const SAVE_ICON=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>`;
+const TRASH_ICON=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`;
+const PDF_ICON=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:5px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 0 0 0-3H9v5"/><path d="M13.5 17v-5H15a1.5 1.5 0 0 1 1.5 1.5V15A1.5 1.5 0 0 1 15 16.5h-1.5"/><path d="M19 12.5h-1.8v4.5"/><path d="M19 14.5h-1.8"/></svg>`;
+let units=[];
+let invoices=[];
+let elecInvoices=[];
+let meters=[];
+let elecMonth=new Date().toISOString().slice(0,7);
+let etatMonth=new Date().toISOString().slice(0,7);
+let editingElecId=null;
+let currentTab='immeuble';
+let selectedMonth=new Date().toISOString().slice(0,7);
+let editingUnitId=null;
+let previewInvoiceId=null;
+let previewMsg=null;
+let genMessage=null;
+let rapportFilter='toutes';
+let backupMsg=null;
+let selectedIds=new Set();
+let selectedElecIds=new Set();
+
+function fmt(n){ return new Intl.NumberFormat('fr-FR').format(n||0)+' MRU'; }
+function monthLabel(m){
+  const [y,mo]=m.split('-');
+  const noms=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  return noms[parseInt(mo,10)-1]+' '+y;
+}
+function fmtDate(d){
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+function toISO(d){
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function monthBounds(m){
+  const [y,mo]=m.split('-').map(Number);
+  return { start: toISO(new Date(y, mo-1, 1)), end: toISO(new Date(y, mo, 0)) };
+}
+function periodLabel(f){
+  return `Du ${fmtDate(new Date(f.periodStart))} au ${fmtDate(new Date(f.periodEnd))}`;
+}
+
+function numToWords(n){
+  if(n===0) return 'zéro';
+  const units=['','un','deux','trois','quatre','cinq','six','sept','huit','neuf','dix','onze','douze','treize','quatorze','quinze','seize','dix-sept','dix-huit','dix-neuf'];
+  const tens=['','dix','vingt','trente','quarante','cinquante','soixante','soixante-dix','quatre-vingt','quatre-vingt-dix'];
+
+  function twoDigits(x){
+    if(x<20) return units[x];
+    if(x<70){
+      const t=Math.floor(x/10), u=x%10;
+      if(u===0) return tens[t];
+      if(u===1) return tens[t]+'-et-un';
+      return tens[t]+'-'+units[u];
+    }
+    if(x<80){
+      const u=x-60;
+      return u===11 ? 'soixante-et-onze' : 'soixante-'+units[u];
+    }
+    if(x===80) return 'quatre-vingts';
+    return 'quatre-vingt-'+units[x-80];
+  }
+  function threeDigits(x){
+    const c=Math.floor(x/100), r=x%100;
+    let str='';
+    if(c>0){
+      str += (c===1?'cent':units[c]+' cent');
+      if(c>1 && r===0) str+='s';
+      if(r>0) str+=' ';
+    }
+    if(r>0) str+=twoDigits(r);
+    return str;
+  }
+  const millions=Math.floor(n/1000000);
+  const thousands=Math.floor((n%1000000)/1000);
+  const rest=n%1000;
+  let parts=[];
+  if(millions>0) parts.push(millions===1?'un million':threeDigits(millions)+' millions');
+  if(thousands>0) parts.push(thousands===1?'mille':threeDigits(thousands)+' mille');
+  if(rest>0 || parts.length===0) parts.push(threeDigits(rest));
+  return parts.join(' ').trim();
+}
+function montantEnLettres(n){
+  const entier = Math.round(Number(n)||0);
+  const mots = numToWords(entier);
+  return mots.charAt(0).toUpperCase()+mots.slice(1)+' ouguiyas';
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+const HAS_CLAUDE_STORAGE = typeof window.storage !== 'undefined' && typeof window.storage.get === 'function';
+async function getStored(key, fallback){
+  try{
+    if(HAS_CLAUDE_STORAGE){
+      const r = await window.storage.get(key, false);
+      return r ? JSON.parse(r.value) : fallback;
+    }
+    const raw = localStorage.getItem('immeuble:'+key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ return fallback; }
+}
+async function setStored(key, value){
+  try{
+    if(HAS_CLAUDE_STORAGE){ await window.storage.set(key, JSON.stringify(value), false); return; }
+    localStorage.setItem('immeuble:'+key, JSON.stringify(value));
+  }catch(e){ console.error('Erreur de sauvegarde', e); }
+}
+
+function buildDefaultUnits(){
+  const u=[];
+  for(let i=1;i<=12;i++){
+    u.push({id:'A'+i, type:'appartement', label:'Appt '+i, floor:Math.ceil(i/3), tenantName:'', phone:'', rent:0, status:'vacant'});
+  }
+  for(let i=1;i<=6;i++){
+    u.push({id:'M'+i, type:'magasin', label:'Magasin '+i, floor:0, tenantName:'', phone:'', rent:0, status:'vacant'});
+  }
+  return u;
+}
+function buildDefaultMeters(){
+  const shared = ['M1','M3','M4'];
+  const m=[];
+  m.push({id:'meter-shared-shops', label:'Compteur commun — Magasins 1, 3, 4', unitIds:shared});
+  units.forEach(u=>{
+    if(shared.includes(u.id)) return;
+    m.push({id:'meter-'+u.id, label:u.label, unitIds:[u.id]});
+  });
+  return m;
+}
+function migrateSharedMeter(){
+  const desired = ['M1','M3','M4'];
+  const shared = meters.find(m=>m.id==='meter-shared-shops');
+  if(!shared) return false;
+  const same = shared.unitIds.length===desired.length && desired.every(id=>shared.unitIds.includes(id));
+  if(same) return false;
+  shared.unitIds = desired;
+  shared.label = 'Compteur commun — Magasins 1, 3, 4';
+  meters = meters.filter(m=> m.id==='meter-shared-shops' || !desired.includes(m.unitIds[0]));
+  if(!meters.some(m=>m.unitIds.includes('M2'))){
+    const u2 = units.find(u=>u.id==='M2');
+    if(u2) meters.push({id:'meter-M2', label:u2.label, unitIds:['M2']});
+  }
+  return true;
+}
+
+/* Ordre voulu : Appt 01..12, puis les magasins */
+function typeRank(t){ return t==='appartement' ? 0 : 1; }
+function labelNum(label){ return parseInt((String(label).match(/\d+/)||['0'])[0], 10); }
+function unitSortKey(u){ return [typeRank(u.type), labelNum(u.label)]; }
+function compareKeys(ka,kb){ return ka[0]!==kb[0] ? ka[0]-kb[0] : ka[1]-kb[1]; }
+function compareUnits(a,b){ return compareKeys(unitSortKey(a), unitSortKey(b)); }
+function meterSortKey(m){
+  const us = units.filter(u=>m.unitIds.includes(u.id));
+  if(us.length===0) return [99,9999];
+  return us.map(unitSortKey).sort(compareKeys)[0];
+}
+function compareMeters(a,b){ return compareKeys(meterSortKey(a), meterSortKey(b)); }
+
+async function init(){
+  units = await getStored(UNIT_KEY, null);
+  if(!units){ units = buildDefaultUnits(); }
+  units.sort(compareUnits);
+  await setStored(UNIT_KEY, units);
+  invoices = await getStored(INV_KEY, []);
+  if(backfillInvoiceNumbers()) await setStored(INV_KEY, invoices);
+  meters = await getStored(METER_KEY, null);
+  if(!meters){ meters = buildDefaultMeters(); }
+  if(migrateSharedMeter()) {}
+  meters.sort(compareMeters);
+  await setStored(METER_KEY, meters);
+  elecInvoices = await getStored(ELEC_KEY, []);
+  if(migrateElecNumbers()) await setStored(ELEC_KEY, elecInvoices);
+  render();
+}
+function migrateElecNumbers(){
+  let changed=false;
+  const sorted=[...elecInvoices].sort((a,b)=> (a.dateGenerated||'').localeCompare(b.dateGenerated||'') || a.month.localeCompare(b.month));
+  const countByYear={};
+  sorted.forEach(f=>{
+    const y=f.month.split('-')[0];
+    if(f.invoiceNumber && f.invoiceNumber.includes('/TFS/')){
+      countByYear[y]=Math.max(countByYear[y]||499, parseInt(f.invoiceNumber.split('/')[0],10)||499);
+      return;
+    }
+    countByYear[y]=(countByYear[y]||499)+1;
+    f.invoiceNumber=`${countByYear[y]}/TFS/${y}`;
+    changed=true;
+  });
+  return changed;
+}
+
+function backfillInvoiceNumbers(){
+  let changed=false;
+  const sorted = [...invoices].sort((a,b)=> (a.dateGenerated||'').localeCompare(b.dateGenerated||'') || a.month.localeCompare(b.month));
+  const countByYear={};
+  const seen=new Set();
+  sorted.forEach(f=>{
+    const y = f.month.split('-')[0];
+    if(!f.periodStart || !f.periodEnd){
+      const b = monthBounds(f.month);
+      f.periodStart = b.start; f.periodEnd = b.end;
+      changed=true;
+    }
+    const num = f.invoiceNumber ? parseInt(f.invoiceNumber.split('/')[0],10) : NaN;
+    if(f.invoiceNumber && !isNaN(num) && num>=600 && !seen.has(f.invoiceNumber)){
+      seen.add(f.invoiceNumber);
+      countByYear[y] = Math.max(countByYear[y]||599, num);
+      return;
+    }
+    countByYear[y] = (countByYear[y]||599)+1;
+    f.invoiceNumber = `${countByYear[y]}/TF/${y}`;
+    seen.add(f.invoiceNumber);
+    changed=true;
+  });
+  return changed;
+}
+function nextInvoiceNumber(year){
+  const nums = invoices
+    .filter(f=>f.invoiceNumber && f.invoiceNumber.endsWith('/TF/'+year))
+    .map(f=>parseInt(f.invoiceNumber.split('/')[0],10))
+    .filter(n=>!isNaN(n) && n>=600);
+  const maxNum = nums.length ? Math.max(...nums) : 599;
+  return `${maxNum+1}/TF/${year}`;
+}
+function nextElecNumber(year){
+  const nums = elecInvoices
+    .filter(f=>f.invoiceNumber && f.invoiceNumber.endsWith('/TFS/'+year))
+    .map(f=>parseInt(f.invoiceNumber.split('/')[0],10))
+    .filter(n=>!isNaN(n) && n>=500);
+  const maxNum = nums.length ? Math.max(...nums) : 499;
+  return `${maxNum+1}/TFS/${year}`;
+}
+
+function render(){
+  const app=document.getElementById('app');
+  const occupied = units.filter(u=>u.status==='occupied');
+  const revenuPrevu = occupied.reduce((s,u)=>s+(Number(u.rent)||0),0);
+  const impayees = invoices.filter(f=>f.status==='unpaid');
+  const totalImpaye = impayees.reduce((s,f)=>s+(Number(f.amount)||0),0);
+
+  app.innerHTML = `
+    <p class="eyebrow">Résidence · Gestion locative</p>
+    <h1>L'Immeuble — 12 appartements · 6 magasins</h1>
+    <p class="subtitle">Locataires, facturation mensuelle et rapports en un seul endroit.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="val">${occupied.length}/18</div><div class="lbl">Unités occupées</div></div>
+      <div class="kpi"><div class="val">${fmt(revenuPrevu)}</div><div class="lbl">Revenu mensuel prévu</div></div>
+      <div class="kpi"><div class="val">${impayees.length}</div><div class="lbl">Factures impayées</div></div>
+      <div class="kpi"><div class="val">${fmt(totalImpaye)}</div><div class="lbl">Total impayé</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn ${currentTab==='immeuble'?'active':''}" onclick="setTab('immeuble')">Immeuble</button>
+      <button class="tab-btn ${currentTab==='facturation'?'active':''}" onclick="setTab('facturation')">Facturation</button>
+      <button class="tab-btn ${currentTab==='electricite'?'active':''}" onclick="setTab('electricite')">Électricité</button>
+      <button class="tab-btn ${currentTab==='rapports'?'active':''}" onclick="setTab('rapports')">Rapports</button>
+    </div>
+
+    <div class="panel">
+      ${currentTab==='immeuble' ? renderImmeuble() : ''}
+      ${currentTab==='facturation' ? renderFacturation() : ''}
+      ${currentTab==='electricite' ? renderElectricite() : ''}
+      ${currentTab==='rapports' ? renderRapports() : ''}
+    </div>
+
+    <div class="row between" style="margin-top:16px;">
+      <div class="row" style="gap:8px;">
+        <button class="btn btn-sm" onclick="exportBackup()">${SAVE_ICON}Sauvegarder mes données</button>
+        <button class="btn btn-sm" onclick="document.getElementById('restoreFile').click()">Restaurer une sauvegarde</button>
+        <input type="file" id="restoreFile" accept="application/json" style="display:none;" onchange="importBackup(event)">
+      </div>
+      <button class="footer-link" onclick="resetAll()">Réinitialiser toutes les données</button>
+    </div>
+    ${backupMsg ? `<div class="msg" style="margin-top:10px;">${backupMsg}</div>` : ''}
+
+    ${editingUnitId ? renderUnitModal() : ''}
+    ${previewInvoiceId ? renderPreviewModal() : ''}
+    ${editingElecId ? renderElecEditModal() : ''}
+  `;
+}
+
+function setTab(t){ currentTab=t; genMessage=null; backupMsg=null; render(); }
+
+/* ---------- IMMEUBLE ---------- */
+function renderImmeuble(){
+  const floors=[4,3,2,1];
+  let html = `<h2>Plan de l'immeuble</h2><p class="desc">Cliquez sur une unité pour renseigner le locataire, le loyer et le statut.</p><div class="building">`;
+  floors.forEach(f=>{
+    const us = units.filter(u=>u.type==='appartement' && u.floor===f);
+    html += `<div class="floor"><div class="floor-label">Étage ${f}</div><div class="floor-units appts">`;
+    us.forEach(u=> html+=unitCell(u));
+    html += `</div></div>`;
+  });
+  const shops = units.filter(u=>u.type==='magasin');
+  html += `<div class="floor"><div class="floor-label">Rez-de-chaussée</div><div class="floor-units">`;
+  shops.forEach(u=> html+=unitCell(u));
+  html += `</div></div>`;
+  html += `<div class="legend"><span><i class="dotL" style="background:#4FCE86"></i>Loué</span><span><i class="dotL" style="background:#E8A33D"></i>Occupé sans facture</span><span><i class="dotL" style="background:#8FA4B3"></i>Vacant</span></div>`;
+  html += `</div>`;
+  return html;
+}
+function unitDotState(u){
+  if(u.status!=='occupied') return { cls:'vacant', label:'Vacant' };
+  const hasInvoice = invoices.some(f=>f.unitId===u.id || f.unitLabel===u.label);
+  if(!hasInvoice) return { cls:'warn', label:'Occupé sans facture' };
+  return { cls:'occupied', label:'Loué' };
+}
+function unitCell(u){
+  const name = u.tenantName ? u.tenantName : '—';
+  const st = unitDotState(u);
+  return `<div class="unit" onclick="openUnit('${u.id}')" title="${st.label}">
+    <div class="dot ${st.cls}"></div>
+    <div class="u-id">${u.label}</div>
+    <div class="u-name">${escapeHtml(name)}</div>
+  </div>`;
+}
+function openUnit(id){ editingUnitId=id; render(); }
+function closeUnit(){ editingUnitId=null; render(); }
+function renderUnitModal(){
+  const u = units.find(x=>x.id===editingUnitId);
+  if(!u) return '';
+  return `<div class="overlay" onclick="if(event.target===this) closeUnit()">
+    <div class="modal">
+      <h3>${u.label} <span style="color:var(--ink-soft);font-weight:400;">(${u.type==='appartement'?'appartement':'magasin'})</span></h3>
+      <div class="field"><label>Nom du locataire</label><input id="f-name" value="${escapeAttr(u.tenantName)}" placeholder="Nom complet"></div>
+      <div class="field"><label>Téléphone</label><input id="f-phone" value="${escapeAttr(u.phone)}" placeholder="+222 ..."></div>
+      <div class="field"><label>Loyer mensuel (MRU)</label><input id="f-rent" type="number" min="0" value="${u.rent||0}"></div>
+      <div class="field"><label>Statut</label>
+        <select id="f-status">
+          <option value="occupied" ${u.status==='occupied'?'selected':''}>Occupé</option>
+          <option value="vacant" ${u.status==='vacant'?'selected':''}>Vacant</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeUnit()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveUnit()">Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function saveUnit(){
+  const u = units.find(x=>x.id===editingUnitId);
+  u.tenantName = document.getElementById('f-name').value.trim();
+  u.phone = document.getElementById('f-phone').value.trim();
+  u.rent = Number(document.getElementById('f-rent').value)||0;
+  u.status = document.getElementById('f-status').value;
+  await setStored(UNIT_KEY, units);
+  editingUnitId=null;
+  render();
+}
+
+/* ---------- APERÇU / ÉDITION DE FACTURE ---------- */
+function openPreview(id){ previewInvoiceId=id; previewMsg=null; render(); }
+function closePreview(){ previewInvoiceId=null; previewMsg=null; render(); }
+function renderPreviewModal(){
+  const f = invoices.find(x=>x.id===previewInvoiceId);
+  if(!f) return '';
+  return `<div class="overlay" onclick="if(event.target===this) closePreview()">
+    <div class="modal" style="max-width:400px;">
+      <h3>Facture ${f.invoiceNumber||''} — ${escapeHtml(f.tenantName)}</h3>
+      <div class="row">
+        <div class="field" style="flex:1;"><label>Date du</label><input type="date" id="p-start" value="${f.periodStart}"></div>
+        <div class="field" style="flex:1;"><label>Date au</label><input type="date" id="p-end" value="${f.periodEnd}"></div>
+      </div>
+      ${previewMsg ? `<div class="msg">${previewMsg}</div>` : ''}
+      <div class="modal-actions" style="justify-content:space-between;">
+        <button class="btn btn-danger" onclick="deleteInvoice('${f.id}')">${TRASH_ICON}Supprimer</button>
+        <div class="row" style="gap:8px;">
+          <button class="btn" onclick="closePreview()">Fermer</button>
+          <button class="btn" onclick="savePreviewDates('${f.id}')">${SAVE_ICON}Enregistrer</button>
+          <button class="btn btn-primary" onclick="printInvoice('${f.id}')">${PDF_ICON}Imprimer en PDF</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+async function savePreviewDates(id){
+  const f = invoices.find(x=>x.id===id);
+  const s = document.getElementById('p-start').value;
+  const e = document.getElementById('p-end').value;
+  if(!s || !e){ previewMsg='Veuillez renseigner les deux dates.'; render(); return; }
+  f.periodStart = s; f.periodEnd = e;
+  await setStored(INV_KEY, invoices);
+  previewMsg='Période enregistrée.';
+  render();
+}
+async function deleteInvoice(id){
+  if(!confirm('Supprimer définitivement cette facture ?')) return;
+  invoices = invoices.filter(f=>f.id!==id);
+  await setStored(INV_KEY, invoices);
+  previewInvoiceId=null;
+  render();
+}
+
+/* ---------- FACTURATION ---------- */
+function renderFacturation(){
+  const monthInvoices = invoices.filter(f=>f.month===selectedMonth).sort((a,b)=>compareKeys([typeRank(a.unitType),labelNum(a.unitLabel)],[typeRank(b.unitType),labelNum(b.unitLabel)]));
+  const monthIds = monthInvoices.map(f=>f.id);
+  const allSelected = monthIds.length>0 && monthIds.every(id=>selectedIds.has(id));
+  const nbSelected = monthIds.filter(id=>selectedIds.has(id)).length;
+
+  let html = `<h2>Facturation</h2><p class="desc">Générez automatiquement les factures du mois pour toutes les unités occupées.</p>
+  <div class="row between" style="margin-bottom:16px;">
+    <div class="row">
+      <div class="field" style="margin-bottom:0;"><label>Mois</label><input type="month" value="${selectedMonth}" onchange="changeMonth(this.value)"></div>
+    </div>
+    <button class="btn btn-copper" onclick="generateInvoices()">Générer les factures de ce mois</button>
+  </div>
+  <div style="margin-bottom:16px;">
+    <button class="btn btn-sm" onclick="printAllInvoices()">${PDF_ICON}Imprimer toutes les factures en PDF</button>
+  </div>`;
+  if(genMessage) html += `<div class="msg">${genMessage}</div>`;
+
+  if(monthInvoices.length===0){
+    html += `<div class="empty">Aucune facture pour ${monthLabel(selectedMonth)}. Cliquez sur « Générer » ci-dessus.</div>`;
+  } else {
+    html += `<div class="row between" style="margin-bottom:10px;">
+      <button class="btn btn-sm" onclick="toggleSelectAll(${allSelected})">${allSelected?'Tout désélectionner':'Sélectionner tout'}</button>
+      ${nbSelected>0 ? `
+        <div class="row" style="gap:6px;">
+          <span style="font-size:12px;color:var(--ink-soft);">${nbSelected} sélectionnée(s)</span>
+          <button class="btn btn-sm" onclick="bulkSetStatus('paid')">Marquer payées</button>
+          <button class="btn btn-sm" onclick="bulkSetStatus('unpaid')">Marquer impayées</button>
+          <button class="btn btn-sm btn-danger" onclick="bulkDelete()">${TRASH_ICON}Supprimer</button>
+        </div>` : ''}
+    </div>`;
+    html += `<table><thead><tr><th style="width:26px;"><input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAll(!this.checked)"></th><th>Unité</th><th>Locataire</th><th class="mono">Montant</th><th>Statut</th><th></th></tr></thead><tbody>`;
+    monthInvoices.forEach(f=>{
+      html += `<tr>
+        <td><input type="checkbox" ${selectedIds.has(f.id)?'checked':''} onchange="toggleSelectOne('${f.id}')"></td>
+        <td>${f.unitLabel}</td>
+        <td>${escapeHtml(f.tenantName)}</td>
+        <td class="mono">${fmt(f.amount)}</td>
+        <td><span class="pill ${f.status==='paid'?'paid':'unpaid'}" onclick="toggleStatus('${f.id}')">${f.status==='paid'?'Payée':'Impayée'}</span></td>
+        <td><button class="btn btn-sm" onclick="openPreview('${f.id}')">Facture</button></td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  return html;
+}
+function toggleSelectOne(id){
+  if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+  render();
+}
+function toggleSelectAll(currentlyAllSelected){
+  const monthIds = invoices.filter(f=>f.month===selectedMonth).map(f=>f.id);
+  if(currentlyAllSelected){ monthIds.forEach(id=>selectedIds.delete(id)); }
+  else { monthIds.forEach(id=>selectedIds.add(id)); }
+  render();
+}
+async function bulkSetStatus(status){
+  invoices.forEach(f=>{ if(selectedIds.has(f.id)){ f.status=status; f.datePaid = status==='paid' ? new Date().toISOString().slice(0,10) : null; } });
+  await setStored(INV_KEY, invoices);
+  render();
+}
+async function bulkDelete(){
+  if(!confirm(`Supprimer définitivement les ${selectedIds.size} facture(s) sélectionnée(s) ?`)) return;
+  invoices = invoices.filter(f=>!selectedIds.has(f.id));
+  selectedIds.clear();
+  await setStored(INV_KEY, invoices);
+  render();
+}
+function changeMonth(v){ selectedMonth=v; genMessage=null; selectedIds.clear(); render(); }
+async function generateInvoices(){
+  const eligible = units.filter(u=>u.status==='occupied' && u.tenantName && Number(u.rent)>0);
+  let created=0, skipped=0;
+  eligible.forEach(u=>{
+    const exists = invoices.some(f=>f.unitId===u.id && f.month===selectedMonth);
+    if(exists){ skipped++; return; }
+    const year = selectedMonth.split('-')[0];
+    const b = monthBounds(selectedMonth);
+    invoices.push({
+      id:uid(), invoiceNumber: nextInvoiceNumber(year), unitId:u.id, unitLabel:u.label, unitType:u.type,
+      tenantName:u.tenantName, amount:Number(u.rent), month:selectedMonth,
+      periodStart:b.start, periodEnd:b.end,
+      status:'unpaid', dateGenerated:new Date().toISOString().slice(0,10)
+    });
+    created++;
+  });
+  await setStored(INV_KEY, invoices);
+  genMessage = `${created} facture(s) générée(s)` + (skipped? `, ${skipped} déjà existante(s)`:'') + (eligible.length===0? ' — aucune unité occupée avec loyer renseigné.':'');
+  render();
+}
+async function toggleStatus(id){
+  const f = invoices.find(x=>x.id===id);
+  f.status = f.status==='paid' ? 'unpaid' : 'paid';
+  f.datePaid = f.status==='paid' ? new Date().toISOString().slice(0,10) : null;
+  await setStored(INV_KEY, invoices);
+  render();
+}
+
+/* ---------- ÉLECTRICITÉ ---------- */
+function meterUnits(m){ return units.filter(u=>m.unitIds.includes(u.id)); }
+function meterOccupiedUnits(m){ return meterUnits(m).filter(u=>u.status==='occupied'); }
+function meterTenantLabel(m){
+  const names = meterOccupiedUnits(m).map(u=>u.tenantName).filter(Boolean);
+  return names.length ? names.join(' / ') : '—';
+}
+function meterUnitLabel(m){ return meterUnits(m).map(u=>u.label).join(', '); }
+function lastNewIndex(meterId){
+  const list = elecInvoices.filter(f=>f.meterId===meterId).sort((a,b)=>b.month.localeCompare(a.month));
+  return list.length ? Number(list[0].newIndex) : 0;
+}
+function renderElectricite(){
+  const monthElec = elecInvoices.filter(f=>f.month===elecMonth).sort((a,b)=>compareKeys([typeRank(a.unitType),labelNum(a.unitLabel)],[typeRank(b.unitType),labelNum(b.unitLabel)]));
+  const doneMeterIds = new Set(monthElec.map(f=>f.meterId));
+  const pending = meters.filter(m=>meterOccupiedUnits(m).length>0 && !doneMeterIds.has(m.id));
+
+  let html = `<h2>Électricité</h2><p class="desc">Relevé des index et calcul automatique : (Nouveau index − Ancien index) × ${ELEC_RATE} MRU. Les magasins 1, 3 et 4 partagent un compteur commun.</p>
+  <div class="field" style="max-width:220px;"><label>Mois</label><input type="month" value="${elecMonth}" onchange="changeElecMonth(this.value)"></div>`;
+
+  if(pending.length===0){
+    html += `<div class="empty">Tous les compteurs occupés ont un relevé pour ${monthLabel(elecMonth)}, ou aucune unité n'est occupée.</div>`;
+  } else {
+    html += `<table><thead><tr><th>Compteur</th><th>Locataire(s)</th><th class="mono">Ancien index</th><th class="mono">Nouveau index</th><th class="mono">Consommation</th><th class="mono">Montant</th></tr></thead><tbody>`;
+    pending.forEach(m=>{
+      const old = lastNewIndex(m.id);
+      html += `<tr>
+        <td>${m.label}</td>
+        <td>${escapeHtml(meterTenantLabel(m))}</td>
+        <td class="mono"><input type="number" min="0" id="ei-old-${m.id}" value="${old}" style="width:90px;" oninput="updateElecCalc('${m.id}')"></td>
+        <td class="mono"><input type="number" min="0" id="ei-new-${m.id}" value="${old}" style="width:90px;" oninput="updateElecCalc('${m.id}')"></td>
+        <td class="mono" id="ei-cons-${m.id}">0</td>
+        <td class="mono" id="ei-amt-${m.id}">${fmt(0)}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>
+    <div style="margin-top:14px;"><button class="btn btn-copper" onclick="generateElecInvoices()">Générer les factures d'électricité de ce mois</button></div>`;
+  }
+  if(genMessage) html += `<div class="msg" style="margin-top:14px;">${genMessage}</div>`;
+
+  if(monthElec.length>0){
+    const monthIds = monthElec.map(f=>f.id);
+    const allSelected = monthIds.length>0 && monthIds.every(id=>selectedElecIds.has(id));
+    const nbSelected = monthIds.filter(id=>selectedElecIds.has(id)).length;
+
+    html += `<h2 style="margin-top:26px;">Factures d'électricité — ${monthLabel(elecMonth)}</h2>
+    <div class="row between" style="margin-bottom:10px;">
+      <div class="row" style="gap:8px;">
+        <button class="btn btn-sm" onclick="toggleSelectAllElec(${allSelected})">${allSelected?'Tout désélectionner':'Sélectionner tout'}</button>
+        <button class="btn btn-sm" onclick="printAllElecInvoices()">${PDF_ICON}Imprimer toutes les factures en PDF</button>
+      </div>
+      ${nbSelected>0 ? `
+        <div class="row" style="gap:6px;">
+          <span style="font-size:12px;color:var(--ink-soft);">${nbSelected} sélectionnée(s)</span>
+          <button class="btn btn-sm" onclick="bulkSetStatusElec('paid')">Marquer payées</button>
+          <button class="btn btn-sm" onclick="bulkSetStatusElec('unpaid')">Marquer impayées</button>
+          <button class="btn btn-sm btn-danger" onclick="bulkDeleteElec()">${TRASH_ICON}Supprimer</button>
+        </div>` : ''}
+    </div>
+    <table><thead><tr><th style="width:26px;"><input type="checkbox" ${allSelected?'checked':''} onchange="toggleSelectAllElec(!this.checked)"></th><th>Compteur</th><th>Locataire(s)</th><th class="mono">Ancien</th><th class="mono">Nouveau</th><th class="mono">Conso.</th><th class="mono">Montant</th><th>Statut</th><th></th></tr></thead><tbody>`;
+    monthElec.forEach(f=>{
+      html += `<tr>
+        <td><input type="checkbox" ${selectedElecIds.has(f.id)?'checked':''} onchange="toggleSelectOneElec('${f.id}')"></td>
+        <td>${f.unitLabel}</td>
+        <td>${escapeHtml(f.tenantName)}</td>
+        <td class="mono">${f.oldIndex}</td>
+        <td class="mono">${f.newIndex}</td>
+        <td class="mono">${f.consumption}</td>
+        <td class="mono">${fmt(f.amount)}</td>
+        <td><span class="pill ${f.status==='paid'?'paid':'unpaid'}" onclick="toggleElecStatus('${f.id}')">${f.status==='paid'?'Payée':'Impayée'}</span></td>
+        <td>
+          <button class="btn btn-sm" onclick="openElecEdit('${f.id}')">Modifier</button>
+          <button class="btn btn-sm" onclick="printElecInvoice('${f.id}')">${PDF_ICON}PDF</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteElecInvoice('${f.id}')">${TRASH_ICON}</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  return html;
+}
+function toggleSelectOneElec(id){
+  if(selectedElecIds.has(id)) selectedElecIds.delete(id); else selectedElecIds.add(id);
+  render();
+}
+function toggleSelectAllElec(currentlyAllSelected){
+  const monthIds = elecInvoices.filter(f=>f.month===elecMonth).map(f=>f.id);
+  if(currentlyAllSelected){ monthIds.forEach(id=>selectedElecIds.delete(id)); }
+  else { monthIds.forEach(id=>selectedElecIds.add(id)); }
+  render();
+}
+async function bulkSetStatusElec(status){
+  elecInvoices.forEach(f=>{ if(selectedElecIds.has(f.id)){ f.status=status; f.datePaid = status==='paid' ? new Date().toISOString().slice(0,10) : null; } });
+  await setStored(ELEC_KEY, elecInvoices);
+  render();
+}
+async function bulkDeleteElec(){
+  if(!confirm(`Supprimer définitivement les ${selectedElecIds.size} facture(s) sélectionnée(s) ?`)) return;
+  elecInvoices = elecInvoices.filter(f=>!selectedElecIds.has(f.id));
+  selectedElecIds.clear();
+  await setStored(ELEC_KEY, elecInvoices);
+  render();
+}
+function printAllElecInvoices(){
+  clearOtherPrintArea('printArea');
+  const ids = selectedElecIds.size>0 ? [...selectedElecIds] : elecInvoices.filter(f=>f.month===elecMonth).map(f=>f.id);
+  if(ids.length===0){ alert('Aucune facture à imprimer pour ce mois.'); return; }
+  const list = ids.map(id=>elecInvoices.find(f=>f.id===id)).filter(Boolean);
+  document.getElementById('printArea').innerHTML = list.map(elecInvoicePageHTML).join('') + cumulPageHTML(list, `${list.length} facture${list.length>1?'s':''} — Électricité`);
+  window.print();
+}
+function changeElecMonth(v){ elecMonth=v; genMessage=null; selectedElecIds.clear(); render(); }
+function updateElecCalc(meterId){
+  const oldEl=document.getElementById('ei-old-'+meterId), newEl=document.getElementById('ei-new-'+meterId);
+  const consEl=document.getElementById('ei-cons-'+meterId), amtEl=document.getElementById('ei-amt-'+meterId);
+  const oldV=Number(oldEl.value)||0, newV=Number(newEl.value)||0;
+  const cons = Math.max(0, newV-oldV);
+  consEl.textContent = cons;
+  amtEl.textContent = fmt(cons*ELEC_RATE);
+}
+async function generateElecInvoices(){
+  const eligible = meters.filter(m=>meterOccupiedUnits(m).length>0 && document.getElementById('ei-new-'+m.id));
+  let created=0, skipped=0;
+  const year = elecMonth.split('-')[0];
+  eligible.forEach(m=>{
+    const exists = elecInvoices.some(f=>f.meterId===m.id && f.month===elecMonth);
+    if(exists){ skipped++; return; }
+    const oldV = Number(document.getElementById('ei-old-'+m.id).value)||0;
+    const newV = Number(document.getElementById('ei-new-'+m.id).value)||0;
+    const cons = Math.max(0, newV-oldV);
+    if(cons<=0){ skipped++; return; }
+    const b = monthBounds(elecMonth);
+    const us = meterUnits(m);
+    elecInvoices.push({
+      id:uid(), invoiceNumber: nextElecNumber(year), meterId:m.id,
+      unitId: us.map(u=>u.id).join(','), unitLabel:meterUnitLabel(m),
+      unitType: us.length>1 ? 'commun' : us[0].type,
+      tenantName:meterTenantLabel(m), oldIndex:oldV, newIndex:newV, consumption:cons, amount:cons*ELEC_RATE,
+      month:elecMonth, periodStart:b.start, periodEnd:b.end,
+      status:'unpaid', dateGenerated:new Date().toISOString().slice(0,10)
+    });
+    created++;
+  });
+  await setStored(ELEC_KEY, elecInvoices);
+  genMessage = `${created} facture(s) d'électricité générée(s)` + (skipped? `, ${skipped} ignorée(s) (déjà existante ou consommation nulle)`:'');
+  render();
+}
+async function toggleElecStatus(id){
+  const f = elecInvoices.find(x=>x.id===id);
+  f.status = f.status==='paid' ? 'unpaid' : 'paid';
+  f.datePaid = f.status==='paid' ? new Date().toISOString().slice(0,10) : null;
+  await setStored(ELEC_KEY, elecInvoices);
+  render();
+}
+async function deleteElecInvoice(id){
+  if(!confirm("Supprimer définitivement cette facture d'électricité ?")) return;
+  elecInvoices = elecInvoices.filter(f=>f.id!==id);
+  await setStored(ELEC_KEY, elecInvoices);
+  render();
+}
+function openElecEdit(id){ editingElecId=id; render(); }
+function closeElecEdit(){ editingElecId=null; render(); }
+function renderElecEditModal(){
+  const f = elecInvoices.find(x=>x.id===editingElecId);
+  if(!f) return '';
+  return `<div class="overlay" onclick="if(event.target===this) closeElecEdit()">
+    <div class="modal">
+      <h3>${f.unitLabel} — ${escapeHtml(f.tenantName)}</h3>
+      <div class="row">
+        <div class="field" style="flex:1;"><label>Ancien index</label><input type="number" min="0" id="ee-old" value="${f.oldIndex}"></div>
+        <div class="field" style="flex:1;"><label>Nouveau index</label><input type="number" min="0" id="ee-new" value="${f.newIndex}"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1;"><label>Date du</label><input type="date" id="ee-start" value="${f.periodStart}"></div>
+        <div class="field" style="flex:1;"><label>Date au</label><input type="date" id="ee-end" value="${f.periodEnd}"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeElecEdit()">Annuler</button>
+        <button class="btn" onclick="saveElecEdit('${f.id}')">${SAVE_ICON}Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function saveElecEdit(id){
+  const f = elecInvoices.find(x=>x.id===id);
+  const oldV = Number(document.getElementById('ee-old').value)||0;
+  const newV = Number(document.getElementById('ee-new').value)||0;
+  const s = document.getElementById('ee-start').value;
+  const e = document.getElementById('ee-end').value;
+  f.oldIndex=oldV; f.newIndex=newV; f.consumption=Math.max(0,newV-oldV); f.amount=f.consumption*ELEC_RATE;
+  if(s) f.periodStart=s;
+  if(e) f.periodEnd=e;
+  await setStored(ELEC_KEY, elecInvoices);
+  editingElecId=null;
+  render();
+}
+function elecInvoicePageHTML(f){
+  const typeLabel = f.unitType==='appartement' ? 'Appartement' : f.unitType==='commun' ? 'Compteur commun' : 'Magasin';
+  const designation = `Électricité — ${f.unitLabel} (${typeLabel})`;
+  return `
+    <div class="inv-print-page">
+    <div class="inv-page">
+      <div class="inv-body">
+        <div class="inv-letterhead">
+          <div class="row between" style="align-items:flex-start;">
+            <div>
+              <div class="owner">${OWNER_NAME}</div>
+              <div class="tf">${OWNER_TF}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="inv-title">FACTURE ÉLECTRICITÉ</div>
+              <div class="inv-number">N° ${f.invoiceNumber || ''}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-box" style="margin-bottom:24px;">
+          <div class="k">Locataire</div><div class="v">${escapeHtml(f.tenantName)}</div>
+        </div>
+
+        <table class="inv-table">
+          <thead><tr><th>Désignation</th><th class="mono">Ancien index</th><th class="mono">Nouveau index</th><th class="mono">Consommation</th><th class="mono" style="text-align:right;">Montant</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>${designation}</td>
+              <td class="mono">${f.oldIndex}</td>
+              <td class="mono">${f.newIndex}</td>
+              <td class="mono">${f.consumption}</td>
+              <td class="mono" style="text-align:right;">${fmt(f.amount)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:11.5px;color:var(--ink-soft);margin:-6px 0 10px;">Calcul : (${f.newIndex} − ${f.oldIndex}) × ${ELEC_RATE} MRU · Période : ${periodLabel(f)}</div>
+        <div class="inv-amount">Total : ${fmt(f.amount)}</div>
+
+        <div class="inv-words-box">
+          <div class="k">Arrêtée la présente facture à la somme de</div>
+          <div class="v">${montantEnLettres(f.amount)}</div>
+        </div>
+
+        <div class="inv-box" style="margin-bottom:0;">
+          <div class="k">Statut</div>
+          <div class="v">${f.status==='paid' ? 'Payée le '+fmtDate(new Date(f.datePaid)) : 'Impayée'}</div>
+        </div>
+      </div>
+
+      <div class="inv-footer">
+        <div class="inv-sign"><div class="line">Le Bailleur</div></div>
+        <div class="inv-sign"><div class="line">Le Locataire</div></div>
+      </div>
+    </div>
+    </div>`;
+}
+function printElecInvoice(id){
+  clearOtherPrintArea('printArea');
+  const f = elecInvoices.find(x=>x.id===id);
+  document.getElementById('printArea').innerHTML = elecInvoicePageHTML(f);
+  window.print();
+}
+
+/* ---------- ÉTAT LOCATIF (Annexe : État des Locations, par mois) ---------- */
+function buildEtatLocations(month){
+  const monthInv = invoices.filter(f=>f.month===month);
+  const findInv = (unitId)=> monthInv.find(f=>f.unitId===unitId);
+  const apptUnits = units.filter(u=>u.type==='appartement').sort(compareUnits);
+  const magUnits = units.filter(u=>u.type==='magasin').sort(compareUnits);
+  const apptLoues = apptUnits.filter(u=>findInv(u.id));
+  const magLoues = magUnits.filter(u=>findInv(u.id));
+  const autres = units.filter(u=>!findInv(u.id)).sort(compareUnits);
+  const totalAppt = apptLoues.reduce((s,u)=>s+findInv(u.id).amount,0);
+  const totalMag = magLoues.reduce((s,u)=>s+findInv(u.id).amount,0);
+  return { findInv, apptLoues, magLoues, autres, totalAppt, totalMag, totalGlobal: totalAppt+totalMag };
+}
+function changeEtatMonth(v){ etatMonth=v; render(); }
+function renderEtatLocatif(){
+  const d = buildEtatLocations(etatMonth);
+  const rowLoue = (u)=>{ const f=d.findInv(u.id); return `<tr>
+      <td>${u.label}</td><td>${u.tenantName?escapeHtml(u.tenantName):'—'}</td>
+      <td class="mono">${f.invoiceNumber||''}</td><td class="mono">${periodLabel(f)}</td>
+      <td class="mono" style="text-align:right;">${fmt(f.amount)}</td>
+    </tr>`; };
+  const rowAutre = (u)=>{ const remark = u.tenantName ? escapeHtml(u.tenantName) : (u.status==='occupied'?'Occupé':'Vacant'); const etat = u.status==='occupied' ? 'Occupé (Non Loué)' : 'Non Loué';
+    return `<tr><td>${u.label}</td><td>${remark}</td><td>${etat}</td></tr>`; };
+
+  return `
+    <div class="row between" style="margin-top:26px;align-items:flex-end;">
+      <div>
+        <h2 style="margin:0;">Annexe : État des Locations</h2>
+        <div class="field" style="margin:8px 0 0;max-width:200px;"><label>Période de référence</label><input type="month" value="${etatMonth}" onchange="changeEtatMonth(this.value)"></div>
+      </div>
+      <button class="btn btn-sm" onclick="printEtatLocatif()">${PDF_ICON}Imprimer l'état des locations</button>
+    </div>
+    <p class="desc">Unités louées ce mois (avec n° de facture et période du contrat), et unités non louées / autres.</p>
+
+    <h3 style="margin:16px 0 4px;font-size:13.5px;">1. Appartements loués (${d.apptLoues.length})</h3>
+    ${d.apptLoues.length===0 ? '<div class="empty">Aucun appartement loué pour '+monthLabel(etatMonth)+'.</div>' : `
+    <table><thead><tr><th>Unité</th><th>Locataire</th><th>N° Facture</th><th>Date</th><th class="mono" style="text-align:right;">Montant</th></tr></thead>
+      <tbody>${d.apptLoues.map(rowLoue).join('')}
+        <tr style="font-weight:700;"><td colspan="4">Sous-total appartements loués</td><td class="mono" style="text-align:right;">${fmt(d.totalAppt)}</td></tr>
+      </tbody></table>`}
+
+    <h3 style="margin:20px 0 4px;font-size:13.5px;">2. Magasins loués (${d.magLoues.length})</h3>
+    ${d.magLoues.length===0 ? '<div class="empty">Aucun magasin loué pour '+monthLabel(etatMonth)+'.</div>' : `
+    <table><thead><tr><th>Unité</th><th>Locataire</th><th>N° Facture</th><th>Date</th><th class="mono" style="text-align:right;">Montant</th></tr></thead>
+      <tbody>${d.magLoues.map(rowLoue).join('')}
+        <tr style="font-weight:700;"><td colspan="4">Sous-total magasins loués</td><td class="mono" style="text-align:right;">${fmt(d.totalMag)}</td></tr>
+      </tbody></table>`}
+
+    <h3 style="margin:20px 0 4px;font-size:13.5px;">3. Unités non louées / autres (${d.autres.length})</h3>
+    ${d.autres.length===0 ? '<div class="empty">Toutes les unités sont louées.</div>' : `
+    <table><thead><tr><th>Unité</th><th>Statut / Remarque</th><th>État de la location</th></tr></thead>
+      <tbody>${d.autres.map(rowAutre).join('')}</tbody></table>`}
+  `;
+}
+function etatLocatifPageHTML(){
+  const d = buildEtatLocations(etatMonth);
+  const rowLoue = (u)=>{ const f=d.findInv(u.id); return `<tr>
+      <td>${u.label}</td><td>${u.tenantName?escapeHtml(u.tenantName):'—'}</td>
+      <td class="mono">${f.invoiceNumber||''}</td><td class="mono">${periodLabel(f)}</td>
+      <td class="mono" style="text-align:right;">${fmt(f.amount)}</td>
+    </tr>`; };
+  const rowAutre = (u)=>{ const remark = u.tenantName ? escapeHtml(u.tenantName) : (u.status==='occupied'?'Occupé':'Vacant'); const etat = u.status==='occupied' ? 'Occupé (Non Loué)' : 'Non Loué';
+    return `<tr><td>${u.label}</td><td>${remark}</td><td>${etat}</td></tr>`; };
+  return `
+    <div class="inv-page">
+      <div class="inv-body">
+        <div class="inv-letterhead">
+          <div class="row between" style="align-items:flex-start;">
+            <div><div class="owner">${OWNER_NAME}</div><div class="tf">${OWNER_TF}</div></div>
+            <div style="text-align:right;"><div class="inv-title">ANNEXE : ÉTAT DES LOCATIONS</div>
+              <div class="inv-number">Période de référence : ${monthLabel(etatMonth)}<br>Date d'émission : ${fmtDate(new Date())}</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin:18px 0 4px;font-size:14px;">1. Appartements loués</h3>
+        ${d.apptLoues.length===0 ? '<p style="font-size:12.5px;color:var(--ink-soft);">Aucun appartement loué ce mois.</p>' : `
+        <table class="rep-table"><thead><tr><th>Unité</th><th>Locataire</th><th>N° Facture</th><th>Date</th><th style="text-align:right;">Montant (MRU)</th></tr></thead>
+          <tbody>${d.apptLoues.map(rowLoue).join('')}
+            <tr style="font-weight:700;"><td colspan="4">Sous-total appartements loués</td><td class="mono" style="text-align:right;">${fmt(d.totalAppt)}</td></tr>
+          </tbody></table>`}
+
+        <h3 style="margin:20px 0 4px;font-size:14px;">2. Magasins loués</h3>
+        ${d.magLoues.length===0 ? '<p style="font-size:12.5px;color:var(--ink-soft);">Aucun magasin loué ce mois.</p>' : `
+        <table class="rep-table"><thead><tr><th>Unité</th><th>Locataire</th><th>N° Facture</th><th>Date</th><th style="text-align:right;">Montant (MRU)</th></tr></thead>
+          <tbody>${d.magLoues.map(rowLoue).join('')}
+            <tr style="font-weight:700;"><td colspan="4">Sous-total magasins loués</td><td class="mono" style="text-align:right;">${fmt(d.totalMag)}</td></tr>
+          </tbody></table>`}
+
+        <h3 style="margin:20px 0 4px;font-size:14px;">3. Unités non louées / autres</h3>
+        ${d.autres.length===0 ? '<p style="font-size:12.5px;color:var(--ink-soft);">Toutes les unités sont louées.</p>' : `
+        <table class="rep-table"><thead><tr><th>Unité</th><th>Statut / Remarque</th><th>État de la location</th></tr></thead>
+          <tbody>${d.autres.map(rowAutre).join('')}</tbody></table>`}
+
+        <div class="inv-amount">Montant total des locations : ${fmt(d.totalGlobal)}</div>
+      </div>
+    </div>`;
+}
+function printEtatLocatif(){
+  clearOtherPrintArea('printReportArea');
+  document.getElementById('printReportArea').innerHTML = etatLocatifPageHTML();
+  setTimeout(()=>window.print(), 50);
+}
+
+/* ---------- RAPPORTS ---------- */
+function renderRapports(){
+  const months = [...new Set(invoices.map(f=>f.month))].sort().reverse();
+  const totalFacture = invoices.reduce((s,f)=>s+f.amount,0);
+  const totalPaye = invoices.filter(f=>f.status==='paid').reduce((s,f)=>s+f.amount,0);
+  const totalImpaye = totalFacture-totalPaye;
+
+  const totalFactureElec = elecInvoices.reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const totalPayeElec = elecInvoices.filter(f=>f.status==='paid').reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const totalImpayeElec = totalFactureElec-totalPayeElec;
+
+  const cumulFacture = totalFacture+totalFactureElec;
+  const cumulPaye = totalPaye+totalPayeElec;
+  const cumulImpaye = totalImpaye+totalImpayeElec;
+
+  let html = `<div class="row between"><h2 style="margin:0;">Rapports</h2>
+    <button class="btn btn-sm" onclick="printReport()">${PDF_ICON}Imprimer le rapport en PDF</button>
+  </div>
+  <p class="desc">Synthèse de la facturation, mois par mois.</p>
+
+  <div style="background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+    <div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;margin-bottom:8px;">Cumul général — Loyers + Électricité</div>
+    <div class="row" style="gap:24px;">
+      <div><div class="lbl" style="font-size:10px;color:var(--ink-soft);text-transform:uppercase;">Total facturé</div><div style="font-family:var(--mono);font-size:19px;font-weight:700;">${fmt(cumulFacture)}</div></div>
+      <div><div class="lbl" style="font-size:10px;color:var(--ink-soft);text-transform:uppercase;">Total encaissé</div><div style="font-family:var(--mono);font-size:19px;font-weight:700;color:var(--paid);">${fmt(cumulPaye)}</div></div>
+      <div><div class="lbl" style="font-size:10px;color:var(--ink-soft);text-transform:uppercase;">Total impayé</div><div style="font-family:var(--mono);font-size:19px;font-weight:700;color:var(--unpaid);">${fmt(cumulImpaye)}</div></div>
+    </div>
+  </div>
+
+  <div class="row" style="gap:24px;margin-bottom:6px;">
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Loyers — Facturé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;">${fmt(totalFacture)}</div></div>
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Loyers — Encaissé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--paid);">${fmt(totalPaye)}</div></div>
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Loyers — Impayé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--unpaid);">${fmt(totalImpaye)}</div></div>
+  </div>
+  <div class="row" style="gap:24px;margin-bottom:18px;">
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Électricité — Facturé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;">${fmt(totalFactureElec)}</div></div>
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Électricité — Encaissé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--paid);">${fmt(totalPayeElec)}</div></div>
+    <div><div class="lbl" style="font-size:10.5px;color:var(--ink-soft);text-transform:uppercase;">Électricité — Impayé</div><div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--unpaid);">${fmt(totalImpayeElec)}</div></div>
+  </div>
+  ${renderEtatLocatif()}`;
+
+  if(months.length===0){
+    html += `<div class="empty">Aucune facture générée pour le moment.</div>`;
+    return html;
+  }
+
+  html += `<table><thead><tr><th>Mois</th><th class="mono">Factures</th><th class="mono">Facturé</th><th class="mono">Encaissé</th><th class="mono">Impayé</th><th>Recouvrement</th></tr></thead><tbody>`;
+  months.forEach(m=>{
+    const list = invoices.filter(f=>f.month===m);
+    const fac = list.reduce((s,f)=>s+f.amount,0);
+    const paye = list.filter(f=>f.status==='paid').reduce((s,f)=>s+f.amount,0);
+    const taux = fac>0 ? Math.round(paye/fac*100) : 0;
+    html += `<tr>
+      <td>${monthLabel(m)}</td>
+      <td class="mono">${list.length}</td>
+      <td class="mono">${fmt(fac)}</td>
+      <td class="mono">${fmt(paye)}</td>
+      <td class="mono">${fmt(fac-paye)}</td>
+      <td style="width:120px;">
+        <div style="background:var(--vacant-soft);border-radius:6px;height:8px;overflow:hidden;">
+          <div style="background:var(--occupied);height:8px;width:${taux}%;"></div>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+
+  html += `<div class="row between" style="margin-top:20px;">
+    <h2 style="margin:0;">Toutes les factures</h2>
+    <div class="row">
+      <select onchange="setRapportFilter(this.value)">
+        <option value="toutes" ${rapportFilter==='toutes'?'selected':''}>Toutes</option>
+        <option value="paid" ${rapportFilter==='paid'?'selected':''}>Payées</option>
+        <option value="unpaid" ${rapportFilter==='unpaid'?'selected':''}>Impayées</option>
+      </select>
+      <button class="btn btn-sm" onclick="exportCSV()">Exporter CSV</button>
+    </div>
+  </div>`;
+
+  const filtered = invoices.filter(f=>rapportFilter==='toutes'||f.status===rapportFilter).sort((a,b)=>b.month.localeCompare(a.month));
+  if(filtered.length===0){
+    html += `<div class="empty">Aucune facture pour ce filtre.</div>`;
+  } else {
+    const cumulFiltre = filtered.reduce((s,f)=>s+(Number(f.amount)||0),0);
+    html += `<table><thead><tr><th>Mois</th><th>Unité</th><th>Locataire</th><th class="mono">Montant</th><th>Statut</th></tr></thead><tbody>`;
+    filtered.forEach(f=>{
+      html += `<tr><td>${monthLabel(f.month)}</td><td>${f.unitLabel}</td><td>${escapeHtml(f.tenantName)}</td><td class="mono">${fmt(f.amount)}</td>
+        <td><span class="pill ${f.status==='paid'?'paid':'unpaid'}" onclick="toggleStatus('${f.id}')">${f.status==='paid'?'Payée':'Impayée'}</span></td></tr>`;
+    });
+    html += `<tr><td colspan="3" style="font-weight:700;">Cumul (${filtered.length} facture${filtered.length>1?'s':''})</td><td class="mono" style="font-weight:700;">${fmt(cumulFiltre)}</td><td></td></tr>`;
+    html += `</tbody></table>`;
+  }
+  return html;
+}
+function setRapportFilter(v){ rapportFilter=v; render(); }
+function exportCSV(){
+  let rows=[['Mois','Unité','Type','Locataire','Montant (MRU)','Statut','Date génération','Date paiement']];
+  invoices.forEach(f=>{
+    rows.push([monthLabel(f.month), f.unitLabel, f.unitType, f.tenantName, f.amount, f.status==='paid'?'Payée':'Impayée', f.dateGenerated||'', f.datePaid||'']);
+  });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'factures_immeuble.csv';
+  a.click();
+}
+function printReport(){
+  clearOtherPrintArea('printReportArea');
+  const months = [...new Set(invoices.map(f=>f.month))].sort().reverse();
+  const totalFacture = invoices.reduce((s,f)=>s+f.amount,0);
+  const totalPaye = invoices.filter(f=>f.status==='paid').reduce((s,f)=>s+f.amount,0);
+  const totalImpaye = totalFacture-totalPaye;
+
+  const totalFactureElec = elecInvoices.reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const totalPayeElec = elecInvoices.filter(f=>f.status==='paid').reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const totalImpayeElec = totalFactureElec-totalPayeElec;
+
+  const cumulFacture = totalFacture+totalFactureElec;
+  const cumulPaye = totalPaye+totalPayeElec;
+  const cumulImpaye = totalImpaye+totalImpayeElec;
+
+  let monthsRows = '';
+  months.forEach(m=>{
+    const list = invoices.filter(f=>f.month===m);
+    const fac = list.reduce((s,f)=>s+f.amount,0);
+    const paye = list.filter(f=>f.status==='paid').reduce((s,f)=>s+f.amount,0);
+    monthsRows += `<tr>
+      <td>${monthLabel(m)}</td>
+      <td class="mono">${list.length}</td>
+      <td class="mono">${fmt(fac)}</td>
+      <td class="mono">${fmt(paye)}</td>
+      <td class="mono">${fmt(fac-paye)}</td>
+    </tr>`;
+  });
+  monthsRows += `<tr style="font-weight:700;"><td>Cumul loyers</td><td class="mono">${invoices.length}</td><td class="mono">${fmt(totalFacture)}</td><td class="mono">${fmt(totalPaye)}</td><td class="mono">${fmt(totalImpaye)}</td></tr>`;
+
+  let invoicesRows = '';
+  [...invoices].sort((a,b)=>b.month.localeCompare(a.month)).forEach(f=>{
+    invoicesRows += `<tr>
+      <td>${monthLabel(f.month)}</td>
+      <td>${f.unitLabel}</td>
+      <td>${escapeHtml(f.tenantName)}</td>
+      <td class="mono">${fmt(f.amount)}</td>
+      <td>${f.status==='paid'?'Payée':'Impayée'}</td>
+    </tr>`;
+  });
+  invoicesRows += `<tr style="font-weight:700;"><td colspan="3">Cumul (${invoices.length} facture${invoices.length>1?'s':''})</td><td class="mono">${fmt(totalFacture)}</td><td></td></tr>`;
+
+  const area = document.getElementById('printReportArea');
+  area.innerHTML = `
+    <div class="inv-page">
+      <div class="inv-body">
+        <div class="inv-letterhead">
+          <div class="row between" style="align-items:flex-start;">
+            <div>
+              <div class="owner">${OWNER_NAME}</div>
+              <div class="tf">${OWNER_TF}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="inv-title">RAPPORT</div>
+              <div class="inv-number">Édité le ${fmtDate(new Date())}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-box" style="margin-bottom:14px;">
+          <div class="k">Cumul général — Loyers + Électricité</div>
+        </div>
+        <div class="rep-kpis">
+          <div><div class="k">Total facturé</div><div class="v">${fmt(cumulFacture)}</div></div>
+          <div><div class="k">Total encaissé</div><div class="v" style="color:var(--paid);">${fmt(cumulPaye)}</div></div>
+          <div><div class="k">Total impayé</div><div class="v" style="color:var(--unpaid);">${fmt(cumulImpaye)}</div></div>
+        </div>
+
+        <table class="rep-table" style="margin-top:6px;">
+          <thead><tr><th></th><th class="mono">Facturé</th><th class="mono">Encaissé</th><th class="mono">Impayé</th></tr></thead>
+          <tbody>
+            <tr><td>Loyers</td><td class="mono">${fmt(totalFacture)}</td><td class="mono">${fmt(totalPaye)}</td><td class="mono">${fmt(totalImpaye)}</td></tr>
+            <tr><td>Électricité</td><td class="mono">${fmt(totalFactureElec)}</td><td class="mono">${fmt(totalPayeElec)}</td><td class="mono">${fmt(totalImpayeElec)}</td></tr>
+          </tbody>
+        </table>
+
+        <h3 style="margin:22px 0 4px;font-size:14px;">Synthèse par mois (loyers)</h3>
+        ${months.length===0 ? '<p style="font-size:12.5px;color:var(--ink-soft);">Aucune facture générée.</p>' : `
+        <table class="rep-table">
+          <thead><tr><th>Mois</th><th>Factures</th><th>Facturé</th><th>Encaissé</th><th>Impayé</th></tr></thead>
+          <tbody>${monthsRows}</tbody>
+        </table>`}
+
+        <h3 style="margin:14px 0 4px;font-size:14px;">Détail des factures (loyers)</h3>
+        ${invoices.length===0 ? '<p style="font-size:12.5px;color:var(--ink-soft);">Aucune facture.</p>' : `
+        <table class="rep-table">
+          <thead><tr><th>Mois</th><th>Unité</th><th>Locataire</th><th>Montant</th><th>Statut</th></tr></thead>
+          <tbody>${invoicesRows}</tbody>
+        </table>`}
+      </div>
+    </div>
+  `;
+  window.print();
+}
+
+/* ---------- IMPRESSION ---------- */
+function invoicePageHTML(f){
+  const designation = `Loyer — ${f.unitLabel} (${f.unitType==='appartement'?'Appartement':'Magasin'})`;
+  return `
+    <div class="inv-print-page">
+    <div class="inv-page">
+      <div class="inv-body">
+        <div class="inv-letterhead">
+          <div class="row between" style="align-items:flex-start;">
+            <div>
+              <div class="owner">${OWNER_NAME}</div>
+              <div class="tf">${OWNER_TF}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="inv-title">FACTURE</div>
+              <div class="inv-number">N° ${f.invoiceNumber || ''}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inv-box" style="margin-bottom:24px;">
+          <div class="k">Locataire</div><div class="v">${escapeHtml(f.tenantName)}</div>
+        </div>
+
+        <table class="inv-table">
+          <thead><tr><th>Désignation</th><th>Période</th><th class="mono" style="text-align:right;">Montant</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>${designation}</td>
+              <td class="mono">${periodLabel(f)}</td>
+              <td class="mono" style="text-align:right;">${fmt(f.amount)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="inv-amount">Total : ${fmt(f.amount)}</div>
+
+        <div class="inv-words-box">
+          <div class="k">Arrêtée la présente facture à la somme de</div>
+          <div class="v">${montantEnLettres(f.amount)}</div>
+        </div>
+
+        <div class="inv-box" style="margin-bottom:0;">
+          <div class="k">Statut</div>
+          <div class="v">${f.status==='paid' ? 'Payée le '+fmtDate(new Date(f.datePaid)) : 'Impayée'}</div>
+        </div>
+      </div>
+
+      <div class="inv-footer">
+        <div class="inv-sign"><div class="line">Le Bailleur</div></div>
+        <div class="inv-sign"><div class="line">Le Locataire</div></div>
+      </div>
+    </div>
+    </div>`;
+}
+function cumulPageHTML(list, titre){
+  const total = list.reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const paye = list.filter(f=>f.status==='paid').reduce((s,f)=>s+(Number(f.amount)||0),0);
+  const impaye = total-paye;
+  const rows = list.map(f=>`<tr>
+      <td>${f.unitLabel}</td>
+      <td>${escapeHtml(f.tenantName)}</td>
+      <td class="mono">${fmt(f.amount)}</td>
+      <td>${f.status==='paid'?'Payée':'Impayée'}</td>
+    </tr>`).join('');
+  return `
+    <div class="inv-print-page">
+    <div class="inv-page">
+      <div class="inv-body">
+        <div class="inv-letterhead">
+          <div class="row between" style="align-items:flex-start;">
+            <div><div class="owner">${OWNER_NAME}</div><div class="tf">${OWNER_TF}</div></div>
+            <div style="text-align:right;"><div class="inv-title">RÉCAPITULATIF</div><div class="inv-number">${titre}</div></div>
+          </div>
+        </div>
+        <div class="rep-kpis">
+          <div><div class="k">Total facturé</div><div class="v">${fmt(total)}</div></div>
+          <div><div class="k">Total encaissé</div><div class="v" style="color:var(--paid);">${fmt(paye)}</div></div>
+          <div><div class="k">Total impayé</div><div class="v" style="color:var(--unpaid);">${fmt(impaye)}</div></div>
+        </div>
+        <table class="rep-table" style="margin-top:14px;">
+          <thead><tr><th>Unité</th><th>Locataire</th><th class="mono">Montant</th><th>Statut</th></tr></thead>
+          <tbody>${rows}
+            <tr style="font-weight:700;"><td colspan="2">Cumul (${list.length} facture${list.length>1?'s':''})</td><td class="mono">${fmt(total)}</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>`;
+}
+function printInvoice(id){
+  clearOtherPrintArea('printArea');
+  const f = invoices.find(x=>x.id===id);
+  document.getElementById('printArea').innerHTML = invoicePageHTML(f);
+  window.print();
+}
+function printAllInvoices(){
+  clearOtherPrintArea('printArea');
+  const ids = selectedIds.size>0 ? [...selectedIds] : invoices.filter(f=>f.month===selectedMonth).map(f=>f.id);
+  if(ids.length===0){ alert('Aucune facture à imprimer pour ce mois.'); return; }
+  const list = ids.map(id=>invoices.find(f=>f.id===id)).filter(Boolean);
+  document.getElementById('printArea').innerHTML = list.map(invoicePageHTML).join('') + cumulPageHTML(list, `${list.length} facture${list.length>1?'s':''} — Loyers`);
+  window.print();
+}
+
+/* ---------- UTIL ---------- */
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+/* ---------- SAUVEGARDE / RESTAURATION ---------- */
+function exportBackup(){
+  const data = {
+    app: 'gestion-immeuble',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    units, invoices, elecInvoices, meters
+  };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+  const a = document.createElement('a');
+  const stamp = toISO(new Date());
+  a.href = URL.createObjectURL(blob);
+  a.download = `sauvegarde-immeuble-${stamp}.json`;
+  a.click();
+  backupMsg = 'Sauvegarde téléchargée. Gardez ce fichier en lieu sûr — il vous permettra de restaurer toutes vos données.';
+  render();
+}
+function importBackup(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e)=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data || !Array.isArray(data.units) || !Array.isArray(data.invoices)){
+        backupMsg = 'Fichier invalide : ce n\'est pas une sauvegarde reconnue.';
+        render();
+        return;
+      }
+      if(!confirm('Restaurer cette sauvegarde va remplacer toutes les données actuelles. Continuer ?')) return;
+      units = data.units;
+      invoices = data.invoices;
+      elecInvoices = Array.isArray(data.elecInvoices) ? data.elecInvoices : [];
+      meters = Array.isArray(data.meters) ? data.meters : buildDefaultMeters();
+      units.sort(compareUnits);
+      meters.sort(compareMeters);
+      await setStored(UNIT_KEY, units);
+      await setStored(INV_KEY, invoices);
+      await setStored(ELEC_KEY, elecInvoices);
+      await setStored(METER_KEY, meters);
+      backupMsg = 'Données restaurées avec succès.';
+      render();
+    }catch(err){
+      backupMsg = 'Erreur de lecture du fichier : '+err.message;
+      render();
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function resetAll(){
+  if(!confirm('Réinitialiser toutes les unités et factures ? Cette action est irréversible.')) return;
+  units = buildDefaultUnits();
+  invoices = [];
+  elecInvoices = [];
+  meters = buildDefaultMeters();
+  await setStored(UNIT_KEY, units);
+  await setStored(INV_KEY, invoices);
+  await setStored(ELEC_KEY, elecInvoices);
+  await setStored(METER_KEY, meters);
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
