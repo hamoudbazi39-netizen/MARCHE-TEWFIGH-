@@ -1,12 +1,20 @@
 {
-  "background_color": "#ffffff",
-  "dir": "ltr",
+  "name": "MARCHE TEWFIGH",
+  "short_name": "MARCHE",
+  "start_url": "./index.html",
   "display": "standalone",
-  "name": "MARCHE TEWVIGH",
-  "orientation": "any",
-  "scope": "/",
-  "short_name": "hamoudbazi39-netizen.github",
-  "start_url": "/",
+  "background_color": "#ffffff",
   "theme_color": "#ffffff",
-  "description": "TEWFIGH"
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/609/609803.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/609/609803.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
